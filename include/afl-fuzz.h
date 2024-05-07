@@ -817,6 +817,7 @@ typedef struct afl_state {
   struct skipdet_global *skipdet_g;
 
   u32 num_nonqueue;
+  u8  save_nonqueue;
 
 #ifdef INTROSPECTION
   char  mutation[8072];

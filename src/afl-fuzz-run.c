@@ -923,7 +923,7 @@ common_fuzz_stuff(afl_state_t *afl, u8 *out_buf, u32 len) {
 
   afl->queued_discovered += save_if_interesting(afl, out_buf, len, fault);
 
-  save_nonqueue(afl, out_buf, len);
+  if (afl->save_nonqueue) { save_nonqueue(afl, out_buf, len); }
 
   if (!(afl->stage_cur % afl->stats_update_freq) ||
       afl->stage_cur + 1 == afl->stage_max) {
