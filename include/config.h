@@ -187,8 +187,8 @@
 
 /* Baseline number of random tweaks during a single 'havoc' stage: */
 
-#define HAVOC_CYCLES 256U
-#define HAVOC_CYCLES_INIT 1024U
+#define HAVOC_CYCLES 64U       // 256U
+#define HAVOC_CYCLES_INIT 64U  // 1024U
 
 /* Maximum multiplier for the above (should be a power of two, beware
    of 32-bit int overflows): */
@@ -230,9 +230,9 @@
 /* Probabilities of skipping non-favored entries in the queue, expressed as
    percentages: */
 
-#define SKIP_TO_NEW_PROB 99     /* ...when there are new, pending favorites */
-#define SKIP_NFAV_OLD_PROB 95   /* ...no new favs, cur entry already fuzzed */
-#define SKIP_NFAV_NEW_PROB 75   /* ...no new favs, cur entry not fuzzed yet */
+#define SKIP_TO_NEW_PROB 99   /* ...when there are new, pending favorites */
+#define SKIP_NFAV_OLD_PROB 95 /* ...no new favs, cur entry already fuzzed */
+#define SKIP_NFAV_NEW_PROB 75 /* ...no new favs, cur entry not fuzzed yet */
 
 /* Splicing cycle count: */
 
@@ -347,7 +347,7 @@
       32,  /* One-off with common buffer size         */ \
       64,  /* One-off with common buffer size         */ \
       100, /* One-off with common buffer size         */ \
-      127                        /* Overflow signed 8-bit when incremented  */
+      127  /* Overflow signed 8-bit when incremented  */
 
 #define INTERESTING_8_LEN 9
 
@@ -361,7 +361,7 @@
       1000, /* One-off with common buffer size         */ \
       1024, /* One-off with common buffer size         */ \
       4096, /* One-off with common buffer size         */ \
-      32767                      /* Overflow signed 16-bit when incremented */
+      32767 /* Overflow signed 16-bit when incremented */
 
 #define INTERESTING_16_LEN 10
 
@@ -374,7 +374,7 @@
       65536,      /* Overflow unsig 16 bit                   */ \
       100663045,  /* Large positive number (endian-agnostic) */ \
       2139095040, /* float infinite                          */ \
-      2147483647                 /* Overflow signed 32-bit when incremented */
+      2147483647  /* Overflow signed 32-bit when incremented */
 
 #define INTERESTING_32_LEN 9
 
@@ -540,5 +540,4 @@
 
 #define AFL_TXT_STRING_MAX_MUTATIONS 6
 
-#endif                                                  /* ! _HAVE_CONFIG_H */
-
+#endif /* ! _HAVE_CONFIG_H */
