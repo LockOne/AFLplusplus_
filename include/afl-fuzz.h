@@ -819,6 +819,8 @@ typedef struct afl_state {
   u32 num_nonqueue;
   u8  save_nonqueue;
 
+  FILE * debug_file;
+
 #ifdef INTROSPECTION
   char  mutation[8072];
   char  m_tmp[4096];

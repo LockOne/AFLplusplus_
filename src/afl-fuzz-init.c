@@ -1943,6 +1943,11 @@ void setup_dirs_fds(afl_state_t *afl) {
 
   fflush(afl->fsrv.plot_file);
 
+  tmp = alloc_printf("%s/debug", afl->out_dir);
+  afl->debug_file = fopen(tmp, "w");
+  if (!afl->debug_file) { PFATAL("Unable to create '%s'", tmp); }
+  ck_free(tmp);
+
 #ifdef INTROSPECTION
 
   tmp = alloc_printf("%s/plot_det_data", afl->out_dir);

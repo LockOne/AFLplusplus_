@@ -2581,6 +2581,8 @@ stop_fuzzing:
     (void)unlink(afl->fsrv.out_file);
   }
 
+  if (afl->debug_file) { fclose(afl->debug_file); }
+
   if (afl->orig_cmdline) { ck_free(afl->orig_cmdline); }
   ck_free(afl->fsrv.target_path);
   ck_free(afl->fsrv.out_file);
