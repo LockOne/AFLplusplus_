@@ -211,6 +211,44 @@ inline u8 has_new_bits(afl_state_t *afl, u8 *virgin_map) {
   return ret;
 }
 
+u32 skim_check_block(const u64 *virgin, const u64 *current,
+                     const u64 *current_end, const u16 *block_bitsl);
+
+// Return value == 0 means no new bits, no new additional block bits.
+// Return value == 1 means new bits.
+// Return values > 1 means no new bits, new additional block bits.
+
+inline u32 skim_check_block(const u64 *virgin, const u64 *current,
+                            const u64 *current_end, const u16 *block_bits) {
+  u32 block_idx = 0;
+  u32 ret = 0;
+
+  for (; current < current_end; virgin += 4, current += 4) {
+    u8 u64_idx = 0;
+    for (; u64_idx < 4; u64_idx++) {
+      if (likely(current[u64_idx] == 0)) { continue; }
+
+      if (unlikely(classify_word(current[u64_idx]) & virgin[u64_idx])) {
+        return 1;
+      }
+
+      if (ret != 0) { continue; }
+
+      u8  u8_idx = 0;
+      u8 *cur = (u8 *)&current[u64_idx];
+      for (; u8_idx < 8; u8_idx++) {
+        if (cur[u8_idx] && (block_bits[block_idx] < NUM_ADDITIONAL_INPUTS)) {
+          ret = block_idx;
+          break;
+        }
+        block_idx++;
+      }
+    }
+  }
+
+  return ret;
+}
+
 /* A combination of classify_counts and has_new_bits. If 0 is returned, then the
  * trace bits are kept as-is. Otherwise, the trace bits are overwritten with
  * classified values.
@@ -221,14 +259,26 @@ inline u8 has_new_bits(afl_state_t *afl, u8 *virgin_map) {
  * on rare cases it fall backs to the slow path: classify_counts() first, then
  * return has_new_bits(). */
 
-inline u8 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map) {
+// Return value == 0 means no new bits, no new additional block bits.
+// Return value == 1,2 means new bits.
+// Return values > 2 means no new bits, new additional block bits.
+
+inline u32 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map) {
   /* Handle the hot path first: no new coverage */
   u8 *end = afl->fsrv.trace_bits + afl->fsrv.map_size;
 
 #ifdef WORD_SIZE_64
 
-  if (!skim((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits, (u64 *)end))
-    return 0;
+  if (afl->save_additional_inputs) {
+    const u32 skim_res =
+        skim_check_block((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits,
+                         (u64 *)end, afl->save_bits);
+
+    if (skim_res != 1) { return skim_res; }
+  } else {
+    if (!skim((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits, (u64 *)end))
+      return 0;
+  }
 
 #else
 
@@ -419,6 +469,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
      need_hash = 1;
   s32 fd;
   u64 cksum = 0;
+  u32 new_block_id = 0;
 
   /* Update path frequency. */
 
@@ -444,13 +495,21 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
       new_bits = has_new_bits(afl, afl->virgin_bits);
 
     } else {
-      new_bits = has_new_bits_unclassified(afl, afl->virgin_bits);
+      new_block_id = has_new_bits_unclassified(afl, afl->virgin_bits);
 
-      if (unlikely(new_bits)) { classified = 1; }
+      fprintf(afl->debug_file, "New block id: %u\n", new_block_id);
+
+      if (unlikely(new_block_id == 1 || new_block_id == 2)) {
+        classified = 1;
+        new_bits = new_block_id;
+      }
     }
 
     if (likely(!new_bits)) {
       if (unlikely(afl->crash_mode)) { ++afl->total_crashes; }
+      if (unlikely(new_block_id)) {
+        save_additional_input(afl, mem, len, new_block_id);
+      }
       return 0;
     }
 
@@ -762,16 +821,19 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
   return keeping;
 }
 
-void save_nonqueue(afl_state_t *afl, void *mem, u32 len) {
-  u8 *fn = alloc_printf(
-      "%s/nonqueue/id:%06u%s%s", afl->out_dir, afl->num_nonqueue,
-      afl->file_extension ? "." : "",
-      afl->file_extension ? (const char *)afl->file_extension : "");
+void save_additional_input(afl_state_t *afl, void *mem, u32 len,
+                           u32 new_block_id) {
+  u8 *fn =
+      alloc_printf("%s/additional/id:%06u%s%s,bid:%u", afl->out_dir,
+                   afl->num_additional_inputs, afl->file_extension ? "." : "",
+                   afl->file_extension ? (const char *)afl->file_extension : "",
+                   new_block_id);
 
   s32 fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
   if (unlikely(fd < 0)) { PFATAL("Unable to create '%s'", fn); }
   ck_write(fd, mem, len, fn);
   close(fd);
 
-  afl->num_nonqueue++;
+  afl->save_bits[new_block_id]++;
+  afl->num_additional_inputs++;
 }

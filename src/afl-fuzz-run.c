@@ -41,8 +41,9 @@ u64 time_spent_working = 0;
 /* Execute target application, monitoring for timeouts. Return status
    information. The called program will update afl->fsrv->trace_bits. */
 
-fsrv_run_result_t __attribute__((hot))
-fuzz_run_target(afl_state_t *afl, afl_forkserver_t *fsrv, u32 timeout) {
+fsrv_run_result_t __attribute__((hot)) fuzz_run_target(afl_state_t      *afl,
+                                                       afl_forkserver_t *fsrv,
+                                                       u32 timeout) {
 #ifdef PROFILING
   static u64      time_spent_start = 0;
   struct timespec spec;
@@ -80,8 +81,8 @@ fuzz_run_target(afl_state_t *afl, afl_forkserver_t *fsrv, u32 timeout) {
    old file is unlinked and a new one is created. Otherwise, afl->fsrv.out_fd is
    rewound and truncated. */
 
-u32 __attribute__((hot))
-write_to_testcase(afl_state_t *afl, void **mem, u32 len, u32 fix) {
+u32 __attribute__((hot)) write_to_testcase(afl_state_t *afl, void **mem,
+                                           u32 len, u32 fix) {
   u8 sent = 0;
 
   if (unlikely(afl->custom_mutators_count)) {
@@ -888,8 +889,8 @@ abort_trimming:
    error conditions, returning 1 if it's time to bail out. This is
    a helper function for fuzz_one(). */
 
-u8 __attribute__((hot))
-common_fuzz_stuff(afl_state_t *afl, u8 *out_buf, u32 len) {
+u8 __attribute__((hot)) common_fuzz_stuff(afl_state_t *afl, u8 *out_buf,
+                                          u32 len) {
   u8 fault;
 
   if (unlikely(len = write_to_testcase(afl, (void **)&out_buf, len, 0)) == 0) {
@@ -922,8 +923,6 @@ common_fuzz_stuff(afl_state_t *afl, u8 *out_buf, u32 len) {
   /* This handles FAULT_ERROR for us: */
 
   afl->queued_discovered += save_if_interesting(afl, out_buf, len, fault);
-
-  if (afl->save_nonqueue) { save_nonqueue(afl, out_buf, len); }
 
   if (!(afl->stage_cur % afl->stats_update_freq) ||
       afl->stage_cur + 1 == afl->stage_max) {

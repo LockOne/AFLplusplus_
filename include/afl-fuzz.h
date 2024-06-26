@@ -572,6 +572,8 @@ typedef struct afl_state {
       *virgin_tmout, /* Bits we haven't seen in tmouts   */
       *virgin_crash; /* Bits we haven't seen in crashes  */
 
+  u16 *save_bits;
+
   double *alias_probability; /* alias weighted probabilities     */
   u32    *alias_table;       /* alias weighted random lookup table */
   u32     active_items;      /* enabled entries in the queue     */
@@ -816,10 +818,10 @@ typedef struct afl_state {
 
   struct skipdet_global *skipdet_g;
 
-  u32 num_nonqueue;
-  u8  save_nonqueue;
+  u32 num_additional_inputs;
+  u8  save_additional_inputs;
 
-  FILE * debug_file;
+  FILE *debug_file;
 
 #ifdef INTROSPECTION
   char  mutation[8072];
@@ -1166,14 +1168,14 @@ void minimize_bits(afl_state_t *, u8 *, u8 *);
 #ifndef SIMPLE_FILES
 u8 *describe_op(afl_state_t *, u8, size_t);
 #endif
-u8 save_if_interesting(afl_state_t *, void *, u32, u8);
-u8 has_new_bits(afl_state_t *, u8 *);
-u8 has_new_bits_unclassified(afl_state_t *, u8 *);
+u8  save_if_interesting(afl_state_t *, void *, u32, u8);
+u8  has_new_bits(afl_state_t *, u8 *);
+u32 has_new_bits_unclassified(afl_state_t *, u8 *);
 #ifndef AFL_SHOWMAP
 void classify_counts(afl_forkserver_t *);
 #endif
 
-void save_nonqueue(afl_state_t *, void *, u32);
+void save_additional_input(afl_state_t *, void *, u32, u32);
 
 /* Extras */
 
