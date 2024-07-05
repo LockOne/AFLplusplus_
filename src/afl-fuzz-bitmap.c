@@ -212,14 +212,16 @@ inline u8 has_new_bits(afl_state_t *afl, u8 *virgin_map) {
 }
 
 u32 skim_check_block(const u64 *virgin, const u64 *current,
-                     const u64 *current_end, const u16 *block_bitsl);
+                     const u64 *current_end, const u16 *block_bits,
+                     const u16 *num_additional_inputs);
 
 // Return value == 0 means no new bits, no new additional block bits.
 // Return value == 1 means new bits.
 // Return values > 1 means no new bits, new additional block bits.
 
 inline u32 skim_check_block(const u64 *virgin, const u64 *current,
-                            const u64 *current_end, const u16 *block_bits) {
+                            const u64 *current_end, const u16 *block_bits,
+                            const u16 *num_additional_inputs) {
   u32 block_idx = 0;
   u32 ret = 0;
 
@@ -237,7 +239,8 @@ inline u32 skim_check_block(const u64 *virgin, const u64 *current,
       u8  u8_idx = 0;
       u8 *cur = (u8 *)&current[u64_idx];
       for (; u8_idx < 8; u8_idx++) {
-        if (cur[u8_idx] && (block_bits[block_idx] < NUM_ADDITIONAL_INPUTS)) {
+        if (cur[u8_idx] && (block_bits[block_idx] < NUM_ADDITIONAL_INPUTS) &&
+            (*num_additional_inputs < NUM_ADDITIONAL_INPUTS_EACH_ENTRY)) {
           ret = block_idx;
           break;
         }
@@ -263,7 +266,8 @@ inline u32 skim_check_block(const u64 *virgin, const u64 *current,
 // Return value == 1,2 means new bits.
 // Return values > 2 means no new bits, new additional block bits.
 
-inline u32 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map) {
+inline u32 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map,
+                                     const u16 *num_additional_inputs) {
   /* Handle the hot path first: no new coverage */
   u8 *end = afl->fsrv.trace_bits + afl->fsrv.map_size;
 
@@ -272,7 +276,7 @@ inline u32 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map) {
   if (afl->save_additional_inputs) {
     const u32 skim_res =
         skim_check_block((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits,
-                         (u64 *)end, afl->save_bits);
+                         (u64 *)end, afl->save_bits, num_additional_inputs);
 
     if (skim_res != 1) { return skim_res; }
   } else {
@@ -495,7 +499,9 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
       new_bits = has_new_bits(afl, afl->virgin_bits);
 
     } else {
-      new_block_id = has_new_bits_unclassified(afl, afl->virgin_bits);
+      new_block_id = has_new_bits_unclassified(
+          afl, afl->virgin_bits,
+          &(afl->queue_buf[afl->current_entry]->num_additional_inputs));
 
       fprintf(afl->debug_file, "New block id: %u\n", new_block_id);
 
@@ -823,17 +829,19 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
 
 void save_additional_input(afl_state_t *afl, void *mem, u32 len,
                            u32 new_block_id) {
-  u8 *fn =
-      alloc_printf("%s/additional/id:%06u%s%s,bid:%u", afl->out_dir,
+  struct queue_entry *q = afl->queue_buf[afl->current_entry];
+  u8                 *fn =
+      alloc_printf("%s/additional/id:%06u%s%s,mother:%06u,bid:%u", afl->out_dir,
                    afl->num_additional_inputs, afl->file_extension ? "." : "",
                    afl->file_extension ? (const char *)afl->file_extension : "",
-                   new_block_id);
+                   q->num_additional_inputs, new_block_id);
 
   s32 fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
   if (unlikely(fd < 0)) { PFATAL("Unable to create '%s'", fn); }
   ck_write(fd, mem, len, fn);
   close(fd);
 
+  q->num_additional_inputs++;
   afl->save_bits[new_block_id]++;
   afl->num_additional_inputs++;
 }
