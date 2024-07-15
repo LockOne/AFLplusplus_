@@ -2416,6 +2416,8 @@ int main(int argc, char **argv_orig, char **envp) {
         }
       }
 
+      afl->num_add_inputs_cur_fuzz_one = 0;
+
       skipped_fuzz = fuzz_one(afl);
   #ifdef INTROSPECTION
       ++afl->queue_cur->stats_selected;
@@ -2455,6 +2457,17 @@ int main(int argc, char **argv_orig, char **envp) {
 
         } else {
           afl->queue_cur = afl->queue_buf[afl->current_entry];
+        }
+      } else {
+        struct queue_entry *q = afl->queue_cur;
+        if (q->fuzz_level > FUZZ_LEVEL_LIMIT) {
+          q->disabled = true;
+          if (q->favored) {
+            --afl->pending_favored;
+            afl->smallest_favored = -1;
+          }
+          afl->queue_cur = NULL;
+          afl->reinit_table = 1;
         }
       }
 
