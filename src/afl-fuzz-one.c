@@ -3093,7 +3093,7 @@ static u8 mopt_common_fuzzing(afl_state_t *afl, MOpt_globals_t MOpt_globals) {
       }
     }
 
-    if (afl->stop_soon || res != afl->crash_mode) {
+    if (afl->stop_soon || (res != afl->crash_mode && res != FSRV_RUN_OK)) {
       ++afl->cur_skipped_items;
       goto abandon_entry;
     }

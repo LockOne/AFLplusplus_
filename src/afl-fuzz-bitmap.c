@@ -496,7 +496,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
       afl->n_fuzz[cksum % N_FUZZ_SIZE]++;
   }
 
-  if (likely(fault == afl->crash_mode)) {
+  if (likely(fault == afl->crash_mode || fault == FSRV_RUN_OK)) {
     /* Keep only if there are new bits in the map, add to queue for
        future fuzzing, etc. */
 
@@ -521,7 +521,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
     }
 
     if (likely(!new_bits)) {
-      if (unlikely(afl->crash_mode)) { ++afl->total_crashes; }
+      if (afl->crash_mode) { ++afl->total_crashes; }
       if (unlikely(new_block_id)) {
         save_additional_input(afl, mem, len, new_block_id);
       }
