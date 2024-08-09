@@ -521,7 +521,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
     }
 
     if (likely(!new_bits)) {
-      if (afl->crash_mode) { ++afl->total_crashes; }
+      if (fault == FSRV_RUN_CRASH) { ++afl->total_crashes; }
       if (unlikely(new_block_id)) {
         save_additional_input(afl, mem, len, new_block_id);
       }
