@@ -2719,3 +2719,32 @@ void save_cmdline(afl_state_t *afl, u32 argc, char **argv) {
 
   *buf = 0;
 }
+
+void gen_init_testcase(afl_state_t *afl) {
+  const u32 len = 1024;
+
+  u8 *buf = ck_alloc(len);
+  u8  fault = -1;
+
+  SAYF("Try generating a random testcase...");
+
+  while (fault != FSRV_RUN_OK && fault != FSRV_RUN_CRASH) {
+    u32 idx = 0;
+    for (idx = 0; idx < len; idx++) {
+      buf[idx] = rand() % 256;
+    }
+
+    (void)write_to_testcase(afl, (void **)&buf, len, 1);
+
+    fault = fuzz_run_target(afl, &afl->fsrv, afl->fsrv.exec_tmout);
+  }
+
+  u8 *fn = alloc_printf("%s/queue/id:000000,random_gen", afl->out_dir);
+  s32 fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
+  if (fd < 0) { PFATAL("Unable to create '%s'", fn); }
+  ck_write(fd, buf, len, fn);
+  close(fd);
+
+  add_to_queue(afl, fn, len, 1);
+  ck_free(buf);
+}

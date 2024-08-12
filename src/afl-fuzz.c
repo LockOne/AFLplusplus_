@@ -1210,6 +1210,7 @@ int main(int argc, char **argv_orig, char **envp) {
   }
 
   afl->run_over10m = 1;
+  afl->afl_env.afl_ignore_seed_problems = 1;
 
   if (afl->sync_id && strcmp(afl->sync_id, "addseeds") == 0) {
     FATAL("-M/-S name 'addseeds' is a reserved name, choose something else");
@@ -1220,7 +1221,7 @@ int main(int argc, char **argv_orig, char **envp) {
     FATAL("-M is compatible only with fast and explore -p power schedules");
   }
 
-  if (optind == argc || !afl->in_dir || !afl->out_dir || show_help) {
+  if (optind == argc || !afl->out_dir || show_help) {
     usage(argv[0], show_help);
   }
 
@@ -1343,7 +1344,7 @@ int main(int argc, char **argv_orig, char **envp) {
     fix_up_sync(afl);
   }
 
-  if (!strcmp(afl->in_dir, afl->out_dir)) {
+  if ((afl->in_dir != NULL) && !strcmp(afl->in_dir, afl->out_dir)) {
     FATAL("Input and output directories can't be the same");
   }
 
@@ -1767,9 +1768,11 @@ int main(int argc, char **argv_orig, char **envp) {
 
   setup_cmdline_file(afl, argv + optind);
 
-  read_testcases(afl, NULL);
-  // read_foreign_testcases(afl, 1); for the moment dont do this
-  OKF("Loaded a total of %u seeds.", afl->queued_items);
+  if (afl->in_dir != NULL) {
+    read_testcases(afl, NULL);
+    // read_foreign_testcases(afl, 1); for the moment dont do this
+    OKF("Loaded a total of %u seeds.", afl->queued_items);
+  }
 
   pivot_inputs(afl);
 
@@ -2036,6 +2039,11 @@ int main(int argc, char **argv_orig, char **envp) {
     }
 
     OKF("Cmplog forkserver successfully started");
+  }
+
+  if (afl->in_dir == NULL) {
+    OKF("No -i supplied, starting from scratch.");
+    gen_init_testcase(afl);
   }
 
   load_auto(afl);
