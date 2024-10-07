@@ -51,14 +51,6 @@ using namespace llvm;
 
 namespace {
 
-static cl::opt<std::string> callgraph_fn("callgraph",
-                                         cl::desc("Callgraph file name"),
-                                         cl::init(""));
-
-static cl::opt<std::string> caller_name("caller",
-                                        cl::desc("Target caller name"),
-                                        cl::init(""));
-
 static llvm::cl::opt<bool> dump_ir(
     "dump-ir", llvm::cl::desc("Dump the final IR to stdout"));
 
@@ -232,6 +224,24 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
         module_bc_name.substr(0, module_bc_name.rfind("/")) + "/";
   }
 
+  const std::string target_fn = module_parent_dir + "/targets.txt";
+  std::ifstream     target_f(target_fn);
+
+  if (!target_f.is_open()) {
+    errs() << "Failed to open target file: " << target_fn << "\n";
+    return false;
+  }
+
+  std::set<std::string> target_func_names;
+
+  std::string line;
+  while (std::getline(target_f, line)) {
+    if (line.empty()) { continue; }
+    target_func_names.insert(line);
+  }
+
+  target_f.close();
+
   const std::string callgraph_fn = module_parent_dir + "/callgraph.txt";
   std::ifstream     callgraph_f(callgraph_fn);
 
@@ -239,8 +249,6 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
     errs() << "Failed to open callgraph file: " << callgraph_fn << "\n";
     return false;
   }
-
-  std::string line;
 
   std::string target_func_name = target_func->getName().str();
 
@@ -269,6 +277,8 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
     size_t bracket_pos = line.find(']');
     if (bracket_pos == std::string::npos) { break; }
     line = line.substr(bracket_pos + 1);
+
+    if (target_func_names.find(line) == target_func_names.end()) { continue; }
 
     callee_names.push_back(line);
   }

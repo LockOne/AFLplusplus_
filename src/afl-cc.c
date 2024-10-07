@@ -2898,13 +2898,15 @@ static void edit_params(aflcc_state_t *aflcc, u32 argc, char **argv,
 
       load_llvm_pass(aflcc, "CheckCalleePass.so");
 
-      insert_param(aflcc, "-Xclang");
-      insert_param(aflcc, "-load");
-      insert_param(aflcc, "-Xclang");
-      insert_param(aflcc, find_object(aflcc, "CheckCalleePass.so"));
-
-      insert_param(aflcc, "-mllvm");
-      insert_param(aflcc, "-callgraph=asdf");
+#if 0
+       // dump IR for debugging
+       insert_param(aflcc, "-Xclang");
+       insert_param(aflcc, "-load");
+       insert_param(aflcc, "-Xclang");
+       insert_param(aflcc, find_object(aflcc, "CheckCalleePass.so"));
+       insert_param(aflcc, "-mllvm");
+       insert_param(aflcc, "-dump-ir");
+#endif
 
     } else {
       if (aflcc->instrument_mode == INSTRUMENT_PCGUARD) {
