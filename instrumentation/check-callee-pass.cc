@@ -264,6 +264,7 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
   while (std::getline(callgraph_f, line)) {
     if (line.empty()) { break; }
     if (line.size() < 7) { break; }
+    if (line[0] == '[') { break; }
 
     size_t bracket_pos = line.find(']');
     if (bracket_pos == std::string::npos) { break; }
