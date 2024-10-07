@@ -1884,8 +1884,6 @@ int main(int argc, char **argv_orig, char **envp) {
     afl->virgin_tmout = ck_realloc(afl->virgin_tmout, map_size);
     afl->virgin_crash = ck_realloc(afl->virgin_crash, map_size);
 
-    afl->save_bits = ck_realloc(afl->save_bits, map_size * sizeof(u16));
-
     afl->var_bytes = ck_realloc(afl->var_bytes, map_size);
     afl->top_rated = ck_realloc(afl->top_rated, map_size * sizeof(void *));
     afl->clean_trace = ck_realloc(afl->clean_trace, map_size);
@@ -1930,8 +1928,6 @@ int main(int argc, char **argv_orig, char **envp) {
       afl->virgin_tmout = ck_realloc(afl->virgin_tmout, new_map_size);
       afl->virgin_crash = ck_realloc(afl->virgin_crash, new_map_size);
 
-      afl->save_bits = ck_realloc(afl->save_bits, new_map_size * sizeof(u16));
-
       afl->var_bytes = ck_realloc(afl->var_bytes, new_map_size);
       afl->top_rated =
           ck_realloc(afl->top_rated, new_map_size * sizeof(void *));
@@ -1963,6 +1959,9 @@ int main(int argc, char **argv_orig, char **envp) {
       map_size = new_map_size;
     }
   }
+
+  afl->callee_virgin_bits = ck_alloc(CALLEE_MAP_SIZE);
+  memset(afl->callee_virgin_bits, 255, CALLEE_MAP_SIZE);
 
   if (afl->cmplog_binary) {
     ACTF("Spawning cmplog forkserver");
@@ -1999,8 +1998,6 @@ int main(int argc, char **argv_orig, char **envp) {
       afl->virgin_bits = ck_realloc(afl->virgin_bits, new_map_size);
       afl->virgin_tmout = ck_realloc(afl->virgin_tmout, new_map_size);
       afl->virgin_crash = ck_realloc(afl->virgin_crash, new_map_size);
-
-      afl->save_bits = ck_realloc(afl->save_bits, new_map_size * sizeof(u16));
 
       afl->var_bytes = ck_realloc(afl->var_bytes, new_map_size);
       afl->top_rated =
@@ -2081,7 +2078,7 @@ int main(int argc, char **argv_orig, char **envp) {
     memset(afl->virgin_bits, 255, map_size);
   }
 
-  memset(afl->save_bits, 0, map_size * sizeof(u16));
+  memset(afl->save_bits, 0, CALLEE_MAP_SIZE * sizeof(u16));
 
   memset(afl->virgin_tmout, 255, map_size);
   memset(afl->virgin_crash, 255, map_size);
@@ -2423,8 +2420,6 @@ int main(int argc, char **argv_orig, char **envp) {
           afl->queue_cur = afl->queue_buf[afl->current_entry];
         }
       }
-
-      afl->num_add_inputs_cur_fuzz_one = 0;
 
       skipped_fuzz = fuzz_one(afl);
   #ifdef INTROSPECTION

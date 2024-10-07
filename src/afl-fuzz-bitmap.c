@@ -211,17 +211,21 @@ inline u8 has_new_bits(afl_state_t *afl, u8 *virgin_map) {
   return ret;
 }
 
-u32 skim_check_block(const u64 *virgin, const u64 *current,
-                     const u64 *current_end, const u16 *block_bits);
+u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
+                     const u16 *save_bits);
 
 // Return value == 0 means no new bits, no new additional block bits.
 // Return value == 1 means new bits.
 // Return values > 1 means no new bits, new additional block bits.
 
-inline u32 skim_check_block(const u64 *virgin, const u64 *current,
-                            const u64 *current_end, const u16 *block_bits) {
+inline u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
+                            const u16 *save_bits) {
+  const u64 *current = (const u64 *)cur_bits;
+  const u64 *virgin = (const u64 *)virgin_bits;
+
+  const u64 *current_end = (const u64 *)(cur_bits + CALLEE_MAP_SIZE);
+
   u32 block_idx = 0;
-  u32 ret = 0;
 
   for (; current < current_end; virgin += 4, current += 4) {
     u8 u64_idx = 0;
@@ -231,12 +235,6 @@ inline u32 skim_check_block(const u64 *virgin, const u64 *current,
         continue;
       }
 
-      if (unlikely(classify_word(current[u64_idx]) & virgin[u64_idx])) {
-        return 1;
-      }
-
-      if (ret != 0) { continue; }
-
       u8  u8_idx = 0;
       u8 *cur = (u8 *)&current[u64_idx];
       for (; u8_idx < 8; u8_idx++) {
@@ -245,16 +243,13 @@ inline u32 skim_check_block(const u64 *virgin, const u64 *current,
           continue;
         }
 
-        if (block_bits[block_idx] < NUM_ADDITIONAL_INPUTS) {
-          ret = block_idx;
-          break;
-        }
+        if (save_bits[block_idx] < NUM_ADDITIONAL_INPUTS) { return block_idx; }
         block_idx++;
       }
     }
   }
 
-  return ret;
+  return 0;
 }
 
 /* A combination of classify_counts and has_new_bits. If 0 is returned, then the
@@ -271,23 +266,14 @@ inline u32 skim_check_block(const u64 *virgin, const u64 *current,
 // Return value == 1,2 means new bits.
 // Return values > 2 means no new bits, new additional block bits.
 
-inline u32 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map,
-                                     u8 save_add_inputs) {
+inline u32 has_new_bits_unclassified(afl_state_t *afl, u8 *virgin_map) {
   /* Handle the hot path first: no new coverage */
   u8 *end = afl->fsrv.trace_bits + afl->fsrv.map_size;
 
 #ifdef WORD_SIZE_64
 
-  if (save_add_inputs) {
-    const u32 skim_res =
-        skim_check_block((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits,
-                         (u64 *)end, afl->save_bits);
-
-    if (skim_res != 1) { return skim_res; }
-  } else {
-    if (!skim((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits, (u64 *)end))
-      return 0;
-  }
+  if (!skim((u64 *)virgin_map, (u64 *)afl->fsrv.trace_bits, (u64 *)end))
+    return 0;
 
 #else
 
@@ -502,29 +488,22 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
 
     if (likely(classified)) {
       new_bits = has_new_bits(afl, afl->virgin_bits);
-
     } else {
-      u8 save_additional_input =
-          afl->save_additional_inputs &&
-          (afl->num_add_inputs_cur_fuzz_one <
-           NUM_ADDITIONAL_INPUTS_EACH_FUZZ_ONE) &&
-          (afl->queue_buf[afl->current_entry]->num_additional_inputs <
-           NUM_ADDITIONAL_INPUTS_EACH_ENTRY);
-
-      new_block_id = has_new_bits_unclassified(afl, afl->virgin_bits,
-                                               save_additional_input);
-
-      if (unlikely(new_block_id == 1 || new_block_id == 2)) {
-        classified = 1;
-        new_bits = new_block_id;
-      }
+      new_bits = has_new_bits_unclassified(afl, afl->virgin_bits);
     }
 
     if (likely(!new_bits)) {
       if (fault == FSRV_RUN_CRASH) { ++afl->total_crashes; }
-      if (unlikely(new_block_id)) {
-        save_additional_input(afl, mem, len, new_block_id);
+
+      if (afl->save_additional_inputs) {
+        new_block_id = skim_check_block(
+            afl->shm.callee_map, afl->callee_virgin_bits, afl->save_bits);
+
+        if (new_block_id) {
+          save_additional_input(afl, mem, len, new_block_id);
+        }
       }
+
       return 0;
     }
 
@@ -838,20 +817,17 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
 
 void save_additional_input(afl_state_t *afl, void *mem, u32 len,
                            u32 new_block_id) {
-  struct queue_entry *q = afl->queue_buf[afl->current_entry];
-  u8                 *fn =
-      alloc_printf("%s/additional/id:%06u%s%s,mother:%06u,bid:%u", afl->out_dir,
+  u8 *fn =
+      alloc_printf("%s/additional/id:%06u%s%s,bid:%u", afl->out_dir,
                    afl->num_additional_inputs, afl->file_extension ? "." : "",
                    afl->file_extension ? (const char *)afl->file_extension : "",
-                   q->num_additional_inputs, new_block_id);
+                   new_block_id);
 
   s32 fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
   if (unlikely(fd < 0)) { PFATAL("Unable to create '%s'", fn); }
   ck_write(fd, mem, len, fn);
   close(fd);
 
-  q->num_additional_inputs++;
   afl->save_bits[new_block_id]++;
   afl->num_additional_inputs++;
-  afl->num_add_inputs_cur_fuzz_one++;
 }

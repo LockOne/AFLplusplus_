@@ -189,7 +189,6 @@ struct queue_entry {
   u8 *fname; /* File name for the test case      */
   u32 len;   /* Input length                     */
   u32 id;    /* entry number in queue_buf        */
-  u16 num_additional_inputs;
 
   u8 colorized,   /* Do not run redqueen stage again  */
       cal_failed; /* Calibration failed?              */
@@ -821,9 +820,10 @@ typedef struct afl_state {
 
   u32 num_additional_inputs;
   u8  save_additional_inputs;
-  u8  num_add_inputs_cur_fuzz_one;
 
   FILE *debug_file;
+
+  u8 *callee_virgin_bits;
 
 #ifdef INTROSPECTION
   char  mutation[8072];
@@ -1172,7 +1172,7 @@ u8 *describe_op(afl_state_t *, u8, size_t);
 #endif
 u8  save_if_interesting(afl_state_t *, void *, u32, u8);
 u8  has_new_bits(afl_state_t *, u8 *);
-u32 has_new_bits_unclassified(afl_state_t *, u8 *, u8);
+u32 has_new_bits_unclassified(afl_state_t *, u8 *);
 #ifndef AFL_SHOWMAP
 void classify_counts(afl_forkserver_t *);
 #endif

@@ -115,7 +115,7 @@ void afl_state_init(afl_state_t *afl, uint32_t map_size) {
   afl->virgin_tmout = ck_alloc(map_size);
   afl->virgin_crash = ck_alloc(map_size);
 
-  afl->save_bits = ck_alloc(map_size * sizeof(u16));
+  afl->save_bits = ck_alloc(CALLEE_MAP_SIZE * sizeof(u16));
 
   afl->var_bytes = ck_alloc(map_size);
   afl->top_rated = ck_alloc(map_size * sizeof(void *));
@@ -616,6 +616,8 @@ void afl_state_deinit(afl_state_t *afl) {
   afl_free(afl->in_scratch_buf);
   afl_free(afl->ex_buf);
 
+  ck_free(afl->callee_virgin_bits);
+
   ck_free(afl->virgin_bits);
   ck_free(afl->virgin_tmout);
   ck_free(afl->virgin_crash);
@@ -628,6 +630,10 @@ void afl_state_deinit(afl_state_t *afl) {
   ck_free(afl->clean_trace_custom);
   ck_free(afl->first_trace);
   ck_free(afl->map_tmp_buf);
+
+  ck_free(afl->skipdet_g->virgin_det_bits);
+  ck_free(afl->skipdet_g->inf_prof);
+  ck_free(afl->skipdet_g);
 
   list_remove(&afl_states, afl);
 }
