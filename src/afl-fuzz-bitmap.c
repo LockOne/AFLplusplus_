@@ -226,18 +226,18 @@ inline u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
   const u64 *current_end = (const u64 *)(cur_bits + CALLEE_MAP_SIZE);
 
   u32 block_idx = 0;
+  u8 u64_idx = 0;
+  u8  u8_idx = 0;
 
   for (; current < current_end; virgin += 4, current += 4) {
-    u8 u64_idx = 0;
-    for (; u64_idx < 4; u64_idx++) {
+    for (u64_idx = 0; u64_idx < 4; u64_idx++) {
       if (likely(current[u64_idx] == 0)) {
         block_idx += 8;
         continue;
       }
 
-      u8  u8_idx = 0;
       u8 *cur = (u8 *)&current[u64_idx];
-      for (; u8_idx < 8; u8_idx++) {
+      for (u8_idx = 0; u8_idx < 8; u8_idx++) {
         if (cur[u8_idx] == 0) {
           block_idx++;
           continue;
