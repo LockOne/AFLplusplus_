@@ -198,7 +198,7 @@ Function *CheckCalleePass::get_target_func() {
       if (cur_callee == NULL) { continue; }
 
       const std::string callee_name = cur_callee->getName().str();
-      if (callee_name.find("__unit_driver") != std::string::npos) { continue; }
+      if (callee_name.find("__driver") != std::string::npos) { continue; }
 
       if (callee_name.find("__extract") != std::string::npos) { continue; }
 
@@ -261,9 +261,7 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
 
     line = line.substr(bracket_pos + 1);
 
-    if (line.compare(0, target_func_name.size(), target_func_name) != 0) {
-      continue;
-    }
+    if (line != target_func_name) { continue; }
 
     break;
   }
@@ -296,6 +294,8 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
       errs() << "Can't find callee: " << callee_name << "\n";
       continue;
     }
+
+    outs() << "Found callee: " << callee_name << "\n";
 
     target_callees.insert(callee);
   }
