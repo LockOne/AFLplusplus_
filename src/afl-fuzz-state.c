@@ -617,6 +617,7 @@ void afl_state_deinit(afl_state_t *afl) {
   afl_free(afl->ex_buf);
 
   ck_free(afl->callee_virgin_bits);
+  ck_free(afl->path_cov);
 
   ck_free(afl->virgin_bits);
   ck_free(afl->virgin_tmout);

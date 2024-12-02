@@ -211,12 +211,23 @@ inline u8 has_new_bits(afl_state_t *afl, u8 *virgin_map) {
   return ret;
 }
 
+inline u8 has_new_path_bits(u32 path_hash, u8 *path_cov) {
+  u32 path_byte_idx = path_hash >> 3;
+  u8  path_byte = path_cov[path_byte_idx];
+  u8  path_bit = 1 << (path_hash & 7);
+
+  if (path_byte & path_bit) return 0;
+
+  path_cov[path_byte_idx] = path_byte | path_bit;
+  return 1;
+}
+
 u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
                      const u16 *save_bits);
 
-// Return value == 0 means no new bits, no new additional block bits.
-// Return value == 1 means new bits.
-// Return values > 1 means no new bits, new additional block bits.
+// Return value == 0 means no target bb covered.
+// Return value == 1 means target bb covered.
+// Return values > 1 means new target bb covered.
 
 inline u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
                             const u16 *save_bits) {
@@ -226,7 +237,8 @@ inline u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
   const u64 *current_end = (const u64 *)(cur_bits + CALLEE_MAP_SIZE);
 
   u32 block_idx = 0;
-  u8 u64_idx = 0;
+  u8  bb_covered = 0;
+  u8  u64_idx = 0;
   u8  u8_idx = 0;
 
   for (; current < current_end; virgin += 4, current += 4) {
@@ -243,13 +255,14 @@ inline u32 skim_check_block(const u8 *cur_bits, const u8 *virgin_bits,
           continue;
         }
 
+        bb_covered = 1;
         if (save_bits[block_idx] < NUM_ADDITIONAL_INPUTS) { return block_idx; }
         block_idx++;
       }
     }
   }
 
-  return 0;
+  return bb_covered;
 }
 
 /* A combination of classify_counts and has_new_bits. If 0 is returned, then the
@@ -376,7 +389,9 @@ u8 *describe_op(afl_state_t *afl, u8 new_bits, size_t max_description_len) {
 
   if (is_timeout) { strcat(ret, ",+tout"); }
 
-  if (new_bits == 2) { strcat(ret, ",+cov"); }
+  if (new_bits & 2) {
+    strcat(ret, ",+cov");
+  }
 
   if (unlikely(strlen(ret) >= max_description_len))
     FATAL("describe string is too long");
@@ -492,17 +507,42 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
       new_bits = has_new_bits_unclassified(afl, afl->virgin_bits);
     }
 
+    // fprintf(afl->debug_file, "path hash = %u\n", *afl->shm.path_hash_ptr);
+    // new_bits |= has_new_path_bits(*afl->shm.path_hash_ptr, afl->path_cov);
+
     if (likely(!new_bits)) {
       if (fault == FSRV_RUN_CRASH) { ++afl->total_crashes; }
 
-      if (afl->save_additional_inputs) {
-        new_block_id = skim_check_block(
-            afl->shm.callee_map, afl->callee_virgin_bits, afl->save_bits);
+      if (!afl->save_additional_inputs) { return 0; }
 
-        if (new_block_id) {
-          save_additional_input(afl, mem, len, new_block_id);
-        }
+      new_block_id = skim_check_block(afl->shm.callee_map,
+                                      afl->callee_virgin_bits, afl->save_bits);
+
+      if (new_block_id > 1) {
+        afl->save_bits[new_block_id]++;
+        u8 *fn = alloc_printf(
+            "%s/additional/id:%06u%s%s,bid:%u", afl->out_dir,
+            afl->num_additional_inputs, afl->file_extension ? "." : "",
+            afl->file_extension ? (const char *)afl->file_extension : "",
+            new_block_id);
+        save_additional_input(afl, mem, len, fn);
+        return 0;
       }
+
+      if (new_block_id == 0) {
+        return 0;
+      }
+
+      u32 path_hash = *afl->shm.path_hash_ptr;
+      new_bits = has_new_path_bits(path_hash, afl->path_cov);
+      if (!new_bits) { return 0; }
+
+      u8 *fn = alloc_printf(
+          "%s/additional/id:%06u%s%s,pid:%u", afl->out_dir,
+          afl->num_additional_inputs, afl->file_extension ? "." : "",
+          afl->file_extension ? (const char *)afl->file_extension : "",
+          path_hash);
+      save_additional_input(afl, mem, len, fn);
 
       return 0;
     }
@@ -561,7 +601,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
 
 #endif
 
-    if (new_bits == 2) {
+    if (new_bits & 2) {
       afl->queue_top->has_new_cov = 1;
       ++afl->queued_with_cov;
     }
@@ -815,19 +855,13 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
   return keeping;
 }
 
-void save_additional_input(afl_state_t *afl, void *mem, u32 len,
-                           u32 new_block_id) {
-  u8 *fn =
-      alloc_printf("%s/additional/id:%06u%s%s,bid:%u", afl->out_dir,
-                   afl->num_additional_inputs, afl->file_extension ? "." : "",
-                   afl->file_extension ? (const char *)afl->file_extension : "",
-                   new_block_id);
-
+void save_additional_input(afl_state_t *afl, void *mem, u32 len, u8 *fn) {
   s32 fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
   if (unlikely(fd < 0)) { PFATAL("Unable to create '%s'", fn); }
   ck_write(fd, mem, len, fn);
   close(fd);
 
-  afl->save_bits[new_block_id]++;
+  ck_free(fn);
+
   afl->num_additional_inputs++;
 }

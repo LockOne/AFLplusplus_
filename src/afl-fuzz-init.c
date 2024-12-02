@@ -2726,7 +2726,7 @@ void gen_init_testcase(afl_state_t *afl) {
   u8 *buf = ck_alloc(len);
   u8  fault = -1;
 
-  SAYF("Try generating a random testcase...");
+  SAYF("Try generating a random testcase...\n");
 
   while (fault != FSRV_RUN_OK && fault != FSRV_RUN_CRASH) {
     u32 idx = 0;

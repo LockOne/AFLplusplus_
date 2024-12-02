@@ -259,6 +259,7 @@ class ModuleSanitizerCoverageLTO
   Module                          *Mo = NULL;
   GlobalVariable                  *AFLContext = NULL;
   GlobalVariable                  *AFLMapPtr = NULL;
+  GlobalVariable                  *AFLPathHashPtr = NULL;
   Value                           *MapPtrFixed = NULL;
   AllocaInst                      *CTX_add = NULL;
   std::ofstream                    dFile;
@@ -474,7 +475,9 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
     AFLMapPtr =
         new GlobalVariable(M, PointerType::get(Int8Tyi, 0), false,
                            GlobalValue::ExternalLinkage, 0, "__afl_area_ptr");
-
+    AFLPathHashPtr = new GlobalVariable(M, PointerType::get(Int32Ty, 0), false,
+                                        GlobalValue::ExternalLinkage, 0,
+                                        "__afl_path_hash_ptr");
   } else {
     ConstantInt *MapAddr = ConstantInt::get(Int64Tyi, map_addr);
     MapPtrFixed =
@@ -1048,6 +1051,8 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
   }
 
   // AFL++ END
+
+  // M.print(errs(), nullptr);
 
   // We don't reference these arrays directly in any of our runtime functions,
   // so we need to prevent them from being dead stripped.
@@ -1915,6 +1920,18 @@ void ModuleSanitizerCoverageLTO::InjectCoverageAtBlock(Function   &F,
       ModuleSanitizerCoverageLTO::SetNoSanitizeMetadata(nosan);
     }
 
+    LoadInst *path_hash_ptr =
+        IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLPathHashPtr);
+    ModuleSanitizerCoverageLTO::SetNoSanitizeMetadata(path_hash_ptr);
+
+    Value *path_hash = IRB.CreateLoad(Int32Ty, path_hash_ptr);
+    path_hash = IRB.CreateMul(path_hash, val);
+    path_hash =
+        IRB.CreateURem(path_hash, ConstantInt::get(Int32Ty, PATH_MAP_MAX - 1));
+    path_hash = IRB.CreateAdd(path_hash, ConstantInt::get(Int32Ty, 1));
+
+    auto nosan2 = IRB.CreateStore(path_hash, path_hash_ptr);
+    ModuleSanitizerCoverageLTO::SetNoSanitizeMetadata(nosan2);
     // done :)
 
     ++inst;
@@ -1922,9 +1939,8 @@ void ModuleSanitizerCoverageLTO::InjectCoverageAtBlock(Function   &F,
 
     /*
         auto GuardPtr = IRB.CreateIntToPtr(
-            IRB.CreateAdd(IRB.CreatePointerCast(FunctionGuardArray, IntptrTy),
-                          ConstantInt::get(IntptrTy, Idx * 4)),
-            Int32PtrTy);
+            IRB.CreateAdd(IRB.CreatePointerCast(FunctionGuardArray,
+       IntptrTy), ConstantInt::get(IntptrTy, Idx * 4)), Int32PtrTy);
 
         IRB.CreateCall(SanCovTracePCGuard, GuardPtr)->setCannotMerge();
     */

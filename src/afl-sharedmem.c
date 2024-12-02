@@ -119,6 +119,7 @@ void afl_shm_deinit(sharedmem_t *shm) {
 
   shm->map = NULL;
   shm->callee_map = NULL;
+  shm->path_hash_ptr = NULL;
 }
 
 /* Configure shared memory.
@@ -131,6 +132,8 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
 
   shm->map = NULL;
   shm->cmp_map = NULL;
+  shm->callee_map = NULL;
+  shm->path_hash_ptr = NULL;
 
 #ifdef USEMMAP
 
@@ -270,6 +273,18 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
     }
   }
 
+  shm->path_shm_id = shmget(IPC_PRIVATE, sizeof(u32),
+                            IPC_CREAT | IPC_EXCL | DEFAULT_PERMISSION);
+  
+  if (shm->path_shm_id < 0) {
+    shmctl(shm->shm_id, IPC_RMID, NULL);         // do not leak shmem
+    shmctl(shm->callee_shm_id, IPC_RMID, NULL);  // do not leak shmem
+    if (shm->cmplog_mode) {
+      shmctl(shm->cmplog_shm_id, IPC_RMID, NULL);  // do not leak shmem
+    }
+    PFATAL("shmget() failed, try running afl-system-config");
+  }
+
   if (!non_instrumented_mode) {
     shm_str = alloc_printf("%d", shm->shm_id);
 
@@ -295,13 +310,19 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
     ck_free(shm_str);
   }
 
+  shm_str = alloc_printf("%d", shm->path_shm_id);
+  setenv(PATH_SHM_ENV_VAR, shm_str, 1);
+  ck_free(shm_str);
+
   shm->map = shmat(shm->shm_id, NULL, 0);
   shm->callee_map = shmat(shm->callee_shm_id, NULL, 0);
+  shm->path_hash_ptr = (u32 *) shmat(shm->path_shm_id, NULL, 0);
 
   if (shm->map == (void *)-1 || !shm->map || shm->callee_map == (void *)-1 ||
-      !shm->callee_map) {
+      !shm->callee_map || shm->path_hash_ptr == (void *)-1 || !shm->path_hash_ptr) {
     shmctl(shm->shm_id, IPC_RMID, NULL);         // do not leak shmem
     shmctl(shm->callee_shm_id, IPC_RMID, NULL);  // do not leak shmem
+    shmctl(shm->path_shm_id, IPC_RMID, NULL);    // do not leak shmem
 
     if (shm->cmplog_mode) {
       shmctl(shm->cmplog_shm_id, IPC_RMID, NULL);  // do not leak shmem
@@ -320,9 +341,12 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
 
       shmctl(shm->cmplog_shm_id, IPC_RMID, NULL);  // do not leak shmem
 
+      shmctl(shm->path_shm_id, IPC_RMID, NULL);  // do not leak shmem
+
       PFATAL("shmat() failed");
     }
   }
+
 
 #endif
 

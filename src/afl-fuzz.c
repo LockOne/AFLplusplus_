@@ -1962,6 +1962,8 @@ int main(int argc, char **argv_orig, char **envp) {
 
   afl->callee_virgin_bits = ck_alloc(CALLEE_MAP_SIZE);
   memset(afl->callee_virgin_bits, 255, CALLEE_MAP_SIZE);
+  afl->path_cov = ck_alloc(PATH_MAP_SIZE);
+  memset(afl->path_cov, 0, PATH_MAP_SIZE);
 
   if (afl->cmplog_binary) {
     ACTF("Spawning cmplog forkserver");
@@ -2606,6 +2608,22 @@ stop_fuzzing:
   /* remove tmpfile */
   if (!afl->in_place_resume && afl->fsrv.out_file) {
     (void)unlink(afl->fsrv.out_file);
+  }
+  {
+    u32 path_idx = 0;
+    u32 num_path_cov = 0;
+    for (; path_idx < PATH_MAP_SIZE ; path_idx++) {
+      u8 path_byte = afl->path_cov[path_idx];
+      if (path_byte == 0 ) { continue;}
+
+      u8 path_bit_idx = 0;
+      for (; path_bit_idx < 8; path_bit_idx++) {
+        if ((path_byte & (1 << path_bit_idx)) == 0) { continue; }
+        num_path_cov += 1;
+      }
+    }
+
+    fprintf(afl->debug_file, "Path coverage: %u/%u\n", num_path_cov, PATH_MAP_MAX);
   }
 
   if (afl->debug_file) { fclose(afl->debug_file); }

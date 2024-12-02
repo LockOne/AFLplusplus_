@@ -56,6 +56,9 @@ typedef struct sharedmem {
   s32 callee_shm_id;
   u8 *callee_map;
 
+  s32 path_shm_id;
+  u32 *path_hash_ptr;
+
 } sharedmem_t;
 
 u8  *afl_shm_init(sharedmem_t *, size_t, unsigned char non_instrumented_mode);

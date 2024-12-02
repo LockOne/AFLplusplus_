@@ -172,11 +172,6 @@ bool CheckCalleePass::init_pass_context(llvm::Module &M) {
     }
   }
 
-  if (FilePtrTy == nullptr) {
-    errs() << "Can't find IO_FILE type! Abort.\n";
-    return false;
-  }
-
   return true;
 }
 
@@ -224,8 +219,18 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
         module_bc_name.substr(0, module_bc_name.rfind("/")) + "/";
   }
 
-  const std::string target_fn = module_parent_dir + "/targets.txt";
-  std::ifstream     target_f(target_fn);
+  std::string module_name = module_bc_name;
+  if (module_name.find("/") != std::string::npos) {
+    module_name = module_name.substr(module_name.rfind("/") + 1);
+  }
+
+  if (module_name.find(".") != std::string::npos) {
+    module_name = module_name.substr(0, module_name.rfind("."));
+  }
+
+  const std::string target_fn =
+      module_parent_dir + "/" + module_name + ".targets.txt";
+  std::ifstream target_f(target_fn);
 
   if (!target_f.is_open()) {
     errs() << "Failed to open target file: " << target_fn << "\n";
@@ -242,8 +247,9 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
 
   target_f.close();
 
-  const std::string callgraph_fn = module_parent_dir + "/callgraph.txt";
-  std::ifstream     callgraph_f(callgraph_fn);
+  const std::string callgraph_fn =
+      module_parent_dir + "/" + module_name + ".callgraph.txt";
+  std::ifstream callgraph_f(callgraph_fn);
 
   if (!callgraph_f.is_open()) {
     errs() << "Failed to open callgraph file: " << callgraph_fn << "\n";

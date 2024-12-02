@@ -824,6 +824,7 @@ typedef struct afl_state {
   FILE *debug_file;
 
   u8 *callee_virgin_bits;
+  u8 *path_cov;
 
 #ifdef INTROSPECTION
   char  mutation[8072];
@@ -1177,7 +1178,7 @@ u32 has_new_bits_unclassified(afl_state_t *, u8 *);
 void classify_counts(afl_forkserver_t *);
 #endif
 
-void save_additional_input(afl_state_t *, void *, u32, u32);
+void save_additional_input(afl_state_t *, void *, u32, u8 *);
 
 /* Extras */
 

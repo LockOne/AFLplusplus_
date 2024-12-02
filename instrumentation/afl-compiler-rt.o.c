@@ -122,6 +122,11 @@ u32 __afl_dictionary_len;
 u64 __afl_map_addr;
 u32 __afl_first_final_loc;
 
+
+u32 __afl_path_hash = 1;
+u32 * __afl_path_hash_ptr = &__afl_path_hash;
+
+
 #ifdef __AFL_CODE_COVERAGE
 typedef struct afl_module_info_t afl_module_info_t;
 
@@ -568,6 +573,13 @@ static void __afl_map_shm(void) {
   }
 
   if (id_str) { __afl_callee_map_ptr = (u8 *)shmat(atoi(id_str), NULL, 0); }
+
+  id_str = getenv(PATH_SHM_ENV_VAR);
+  if (id_str) {
+    __afl_path_hash_ptr = (u32 *)shmat(atoi(id_str), NULL, 0);
+  }
+
+  *__afl_path_hash_ptr = 1;
 
   id_str = getenv(CMPLOG_SHM_ENV_VAR);
 
