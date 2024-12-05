@@ -227,6 +227,9 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
   if (module_name.find(".") != std::string::npos) {
     module_name = module_name.substr(0, module_name.rfind("."));
   }
+  if (module_name.find(".") != std::string::npos) {
+    module_name = module_name.substr(0, module_name.rfind("."));
+  }
 
   const std::string target_fn =
       module_parent_dir + "/" + module_name + ".targets.txt";
