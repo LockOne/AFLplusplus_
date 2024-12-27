@@ -513,7 +513,14 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
     if (likely(!new_bits)) {
       if (fault == FSRV_RUN_CRASH) { ++afl->total_crashes; }
 
-      if (!afl->save_additional_inputs) { return 0; }
+      if (afl->save_all) {
+        u8 *fn = alloc_printf(
+            "%s/additional/id:%06u%s%s", afl->out_dir,
+            afl->num_additional_inputs, afl->file_extension ? "." : "",
+            afl->file_extension ? (const char *)afl->file_extension : "");
+        save_additional_input(afl, mem, len, fn);
+        return 0;
+      }
 
       new_block_id = skim_check_block(afl->shm.callee_map,
                                       afl->callee_virgin_bits, afl->save_bits);
@@ -535,6 +542,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
 
       u32 path_hash = *afl->shm.path_hash_ptr;
       new_bits = has_new_path_bits(path_hash, afl->path_cov);
+      // new_bits = 1;
       if (!new_bits) { return 0; }
 
       u8 *fn = alloc_printf(

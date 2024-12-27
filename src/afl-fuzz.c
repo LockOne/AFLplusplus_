@@ -506,7 +506,7 @@ int main(int argc, char **argv_orig, char **envp) {
   // still available: HjJkKqruvwz
   while (
       (opt = getopt(argc, argv,
-                    "+a:Ab:B:c:CdDe:E:f:F:g:G:hi:I:l:L:m:M:nNo:Op:P:QRs:S:t:"
+                    "+a:Ab:B:c:CdDe:E:f:F:g:G:hi:I:jl:L:m:M:nNo:Op:P:QRs:S:t:"
                     "T:UV:WXx:YzZ")) > 0) {
     switch (opt) {
       case 'a':
@@ -566,6 +566,10 @@ int main(int argc, char **argv_orig, char **envp) {
       case 'I':
         afl->infoexec = optarg;
         break;
+
+      case 'j':
+      afl->save_all = 1;
+      break;
 
       case 'b': { /* bind CPU core */
 
@@ -1206,7 +1210,6 @@ int main(int argc, char **argv_orig, char **envp) {
     }
   }
 
-  afl->save_additional_inputs = 1;
   afl->run_over10m = 1;
   afl->afl_env.afl_ignore_seed_problems = 1;
 

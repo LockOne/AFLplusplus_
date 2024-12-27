@@ -55,9 +55,7 @@ fsrv_run_result_t __attribute__((hot)) fuzz_run_target(afl_state_t      *afl,
   }
 
 #endif
-  if (likely(afl->save_additional_inputs)) {
-    memset(afl->shm.callee_map, 0, CALLEE_MAP_SIZE);
-  }
+  memset(afl->shm.callee_map, 0, CALLEE_MAP_SIZE);
 
   fsrv_run_result_t res = afl_fsrv_run_target(fsrv, timeout, &afl->stop_soon);
 

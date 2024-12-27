@@ -819,7 +819,7 @@ typedef struct afl_state {
   struct skipdet_global *skipdet_g;
 
   u32 num_additional_inputs;
-  u8  save_additional_inputs;
+  u8 save_all;
 
   FILE *debug_file;
 

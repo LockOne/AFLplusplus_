@@ -450,7 +450,7 @@ endif
 
 ./CheckCalleePass.so: instrumentation/check-callee-pass.cc instrumentation/afl-llvm-common.o
 ifeq "$(LLVM_LTO)" "1"
-	$(CXX) $(CLANG_CPPFL) -Wno-writable-strings -fno-rtti -fPIC -std=$(LLVM_STDCXX) -shared $< -o $@ $(CLANG_LFL)
+	$(CXX) $(CLANG_CPPFL) -Wno-writable-strings -fno-rtti -fPIC -std=$(LLVM_STDCXX) -shared $< -o $@ $(CLANG_LFL) `llvm-config --ldflags` -lLLVMDemangle
 endif
 
 # laf

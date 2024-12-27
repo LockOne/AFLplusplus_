@@ -47,6 +47,8 @@
 #include <set>
 #include "afl-llvm-common.h"
 
+#include <llvm/Demangle/Demangle.h>
+
 using namespace llvm;
 
 namespace {
@@ -130,11 +132,6 @@ PreservedAnalyses CheckCalleePass::run(Module &M, ModuleAnalysisManager &MAM) {
   Function *target_func = get_target_func();
   if (target_func == NULL) {
     errs() << "No target function found, skipping CheckCalleePass\n";
-    return PA;
-  }
-
-  if (target_func == main_func) {
-    outs() << "Target function is main, skipping CheckCalleePass\n";
     return PA;
   }
 
@@ -236,7 +233,7 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
   std::ifstream target_f(target_fn);
 
   if (!target_f.is_open()) {
-    errs() << "Failed to open target file: " << target_fn << "\n";
+    llvm::errs() << "Failed to open target file: " << target_fn << "\n";
     return false;
   }
 
@@ -255,11 +252,12 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
   std::ifstream callgraph_f(callgraph_fn);
 
   if (!callgraph_f.is_open()) {
-    errs() << "Failed to open callgraph file: " << callgraph_fn << "\n";
+    llvm::errs() << "Failed to open callgraph file: " << callgraph_fn << "\n";
     return false;
   }
 
-  std::string target_func_name = target_func->getName().str();
+  std::string target_func_name = llvm::demangle(target_func->getName().str());
+  if (target_func_name == "__old_main") { target_func_name = "main"; }
 
   while (std::getline(callgraph_f, line)) {
     if (line.empty()) { continue; }
@@ -275,7 +273,7 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
     break;
   }
 
-  std::vector<std::string> callee_names;
+  std::set<std::string> callee_names;
   while (std::getline(callgraph_f, line)) {
     if (line.empty()) { break; }
     if (line.size() < 7) { break; }
@@ -287,27 +285,24 @@ bool CheckCalleePass::read_call_graph(llvm::Function *target_func) {
 
     if (target_func_names.find(line) == target_func_names.end()) { continue; }
 
-    callee_names.push_back(line);
+    callee_names.insert(line);
   }
 
   callgraph_f.close();
 
-  auto       callee_name_iter = callee_names.begin();
-  const auto callee_name_end = callee_names.end();
+  llvm::outs() << "Found " << callee_names.size()
+               << " callee names in callgraph.txt\n";
 
-  for (; callee_name_iter != callee_name_end; ++callee_name_iter) {
-    const std::string &callee_name = *callee_name_iter;
-    llvm::Function    *callee = Mod->getFunction(callee_name);
+  for (llvm::Function &func : Mod->functions()) {
+    const std::string func_name = llvm::demangle(func.getName().str());
 
-    if (callee == NULL) {
-      errs() << "Can't find callee: " << callee_name << "\n";
-      continue;
-    }
+    if (callee_names.find(func_name) == callee_names.end()) { continue; }
+    llvm::outs() << "Found callee: " << func_name << "\n";
 
-    outs() << "Found callee: " << callee_name << "\n";
-
-    target_callees.insert(callee);
+    target_callees.insert(&func);
   }
+
+  llvm::outs() << "Found " << target_callees.size() << " target callees\n";
 
   return true;
 }
