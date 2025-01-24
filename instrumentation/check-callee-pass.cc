@@ -135,6 +135,8 @@ PreservedAnalyses CheckCalleePass::run(Module &M, ModuleAnalysisManager &MAM) {
     return PA;
   }
 
+  outs() << "Target function: " << target_func->getName() << "\n";
+
   if (!read_call_graph(target_func)) {
     errs() << "Failed to read callgraph, skipping CheckCalleePass\n";
     return PA;

@@ -1212,6 +1212,7 @@ int main(int argc, char **argv_orig, char **envp) {
 
   afl->run_over10m = 1;
   afl->afl_env.afl_ignore_seed_problems = 1;
+  afl->afl_env.afl_cal_fast = 1;
 
   if (afl->sync_id && strcmp(afl->sync_id, "addseeds") == 0) {
     FATAL("-M/-S name 'addseeds' is a reserved name, choose something else");
