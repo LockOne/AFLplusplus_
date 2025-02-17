@@ -510,9 +510,7 @@ u8 __attribute__((hot)) save_if_interesting(afl_state_t *afl, void *mem,
     // fprintf(afl->debug_file, "path hash = %u\n", *afl->shm.path_hash_ptr);
     // new_bits |= has_new_path_bits(*afl->shm.path_hash_ptr, afl->path_cov);
 
-    if (likely(!new_bits)) {
-      if (fault == FSRV_RUN_CRASH) { ++afl->total_crashes; }
-
+    if (likely(!new_bits) && (fault != FSRV_RUN_CRASH)) {
       if (afl->save_all) {
         u8 *fn = alloc_printf(
             "%s/additional/id:%06u%s%s", afl->out_dir,
